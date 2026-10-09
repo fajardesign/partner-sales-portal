@@ -17,7 +17,7 @@ export function ToasterProvider({ initialToast, children }) {
     <ToastContext.Provider value={show}>
       {children}
       {toast && (
-        <div style={{ position: 'fixed', top: 'var(--space-24)', right: 'var(--space-24)', zIndex: 200 }}>
+        <div className="ps-toast" style={{ position: 'fixed', top: 'var(--space-24)', right: 'var(--space-24)', zIndex: 200 }}>
           <Toast key={toast.key} status={toast.status} title={toast.title} dismissible onDismiss={() => setToast(null)} />
         </div>
       )}

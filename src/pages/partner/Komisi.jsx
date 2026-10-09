@@ -12,6 +12,7 @@ import { partnerCommission } from '../../api/mockApi.js';
 import { useScenario } from '../../dev/scenario.js';
 import { achievementCell } from '../../lib/achievement.jsx';
 import { bar, nowrap } from '../../lib/cells.jsx';
+import { errorView } from './common.jsx';
 import { formatDate, formatPct, formatRp, monthLabel } from '../../lib/format.js';
 
 const StatusChip = ({ status }) => <Badge color={status === 'ESTIMATE' ? 'orange' : 'green'} size="md">{status === 'ESTIMATE' ? 'Estimasi' : 'Dibayar'}</Badge>;
@@ -26,7 +27,7 @@ export function Komisi(props) {
 function KomisiView({ user, onLogout, path }) {
   const [d, setD] = useState(null);
   const [view, setView] = useState('loading');
-  const load = (retry) => { setView('loading'); partnerCommission(user, { retry }).then((r) => { setD(r); setView(r.history.length ? 'data' : 'empty'); }, () => setView('error')); };
+  const load = (retry) => { setView('loading'); partnerCommission(user, { retry }).then((r) => { setD(r); setView(r.history.length ? 'data' : 'empty'); }, (e) => setView(errorView(e))); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load(false); }, []);
   const ld = view === 'loading';
@@ -50,7 +51,7 @@ function KomisiView({ user, onLogout, path }) {
   return (
     <PartnerShell active={path} icon="HandCoinLine" title="Komisi" description="Estimasi komisi bulan ini dan riwayat komisi per bulan. Pembayaran dilakukan di luar aplikasi ini." user={user} onLogout={onLogout}>
       <TbdCallout>Sumber target paid out dan collection yang dipakai untuk pencapaian dan tier. Prototipe memakai target contoh.</TbdCallout>
-      {view === 'error' ? <ListCard view="error" onRetry={() => load(true)} /> : (
+      {view === 'error' || view === 'notfound' ? <ListCard view={view} onRetry={() => load(true)} /> : (
         <>
           <SectionCard title={`Estimasi bulan ini · ${monthLabel(d?.current?.month ?? '2026-10', true)}`} badge={c ? <StatusChip status={c.status} /> : null}>
             {ld ? bar('100%', 160, 'var(--rounded-12)') : !c ? <span style={{ font: 'var(--paragraph-sm)', color: 'var(--text-sub-600)' }}>Belum ada estimasi komisi bulan ini.</span> : (

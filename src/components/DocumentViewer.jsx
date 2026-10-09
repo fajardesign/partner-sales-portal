@@ -1,15 +1,13 @@
 import { useState } from 'react';
 import { Button, CompactButton, Icon, Modal, ModalFooter, ModalHeader } from '@ds/index.js';
-import { useToast } from './Toaster.jsx';
 
 const ZOOMS = [0.5, 0.75, 1, 1.25, 1.5, 2];
 
 /**
  * Pratinjau dokumen (komposisi Modal DS): zoom, navigasi halaman PDF, Unduh.
- * Prototipe tidak menyimpan file asli — halaman dirender sebagai placeholder berisi nama file.
+ * Prototipe tidak menyimpan file asli — halaman dirender sebagai placeholder berisi nama file. onDownload = aksi Unduh.
  */
-export function DocumentViewer({ doc, file, onClose }) {
-  const toast = useToast();
+export function DocumentViewer({ doc, file, onClose, onDownload }) {
   const [zoom, setZoom] = useState(2);
   const [page, setPage] = useState(1);
   if (!doc) return null;
@@ -43,7 +41,7 @@ export function DocumentViewer({ doc, file, onClose }) {
         </div>
       </div>
       <ModalFooter>
-        <Button variant="stroke" tone="neutral" size="sm" leftIcon={<Icon name="DownloadLine" />} onClick={() => toast('success', `${f.name} diunduh.`)}>Unduh</Button>
+        <Button variant="stroke" tone="neutral" size="sm" leftIcon={<Icon name="DownloadLine" />} onClick={onDownload}>Unduh</Button>
         <Button size="sm" onClick={onClose}>Tutup</Button>
       </ModalFooter>
     </Modal>

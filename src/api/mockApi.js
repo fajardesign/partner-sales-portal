@@ -1,8 +1,9 @@
-// Mock API Partner Dashboard — pengganti backend Partner Dashboard (PRD v3 §F). Hanya data partner & toko milik sesi.
+// Mock API Partner Dashboard — pengganti backend Partner Dashboard (PRD Scope 1 §1.6). Hanya data partner & toko milik sesi.
 // Data di src/api/db.js (salinan seed admin-sales-portal, memori). Fungsi async dengan jeda kecil agar state loading terlihat.
 import { getScenario } from '../dev/scenario.js';
 import { normalizePhone } from '../lib/format.js';
 import { ACTIVATION_TTL_MS, PAGE_SIZE } from '../lib/constants.js';
+import { placeholderFile } from '../lib/download.js';
 import { CURRENT_MONTH, loans, mfp, MONTHS, now, partners, schemes, superAdmins, targets, users, wibDate } from './db.js';
 
 const TEST = import.meta.env.MODE === 'test';
@@ -74,10 +75,27 @@ export function demoPicAccounts() {
 // ------------------------------------------------------------------ partner (isolasi: setiap fungsi hanya membaca partnerId sesi)
 const clone = (o) => structuredClone(o);
 const findP = (partnerId) => partners.find((x) => x.id === partnerId) ?? null;
-/** Partner milik sesi; tidak ditemukan → LOAD_FAILED (API 403/404 di produksi). */
+
+/**
+ * Sesi berakhir karena partner Inactive / akun PIC Disabled (PRD Scope 1 FR-PD-008). App mendaftarkan listener yang
+ * menghapus sesi dan kembali ke login — setara interceptor 401 di klien produksi.
+ */
+const disabledListeners = new Set();
+export function onAccountDisabled(fn) { disabledListeners.add(fn); return () => disabledListeners.delete(fn); }
+
+/**
+ * Partner milik sesi (PRD Scope 1 FR-PD-004, AC-PD-004):
+ * partner tidak ada / bukan milik akun sesi → NOT_FOUND (API 404, bukan 403, agar keberadaan data lain tidak bocor);
+ * partner Inactive atau akun PIC Disabled → ACCOUNT_DISABLED (sesi diakhiri).
+ */
 function own(session) {
   const p = findP(session?.partnerId);
-  if (!p) throw new ApiError('LOAD_FAILED');
+  const u = users.find((x) => x.id === session?.userId && x.role === 'PARTNER');
+  if (!p || (u && u.partnerId !== p.id)) throw new ApiError('NOT_FOUND');
+  if (p.status === 'INACTIVE' || (u && accountStatus(u) === 'DISABLED')) {
+    disabledListeners.forEach((f) => f());
+    throw new ApiError('ACCOUNT_DISABLED');
+  }
   return p;
 }
 const storeName = (p, storeId) => p.stores.find((s) => s.id === storeId)?.name ?? '-';
@@ -137,7 +155,18 @@ function salesStats(rows) {
 }
 const partnerLoans = (p) => loans.filter((l) => l.partnerId === p.id);
 
-// ------------------------------------------------------------------ PDB-05 Beranda Partner (PRD v3 F2)
+// ------------------------------------------------------------------ PDB-05 Beranda Partner (PRD Scope 1 FR-PD-005)
+/**
+ * Ringkasan profil saja (OQ-PD-03): nama PIC, nama & status partner, jumlah toko.
+ * Return { picName, partnerName, status, storeCount }.
+ */
+export async function partnerHome(session, { retry = false } = {}) {
+  await listGate(retry);
+  const p = own(session);
+  return { picName: p.pic.name, partnerName: p.partnerName, status: p.status, storeCount: p.stores.length };
+}
+
+// ------------------------------------------------------------------ Penjualan (PRD v3 F2, disembunyikan sampai Scope 3)
 /**
  * Ringkasan penjualan partner pada periode + periode sebelumnya, tren nominal cair per bulan (6 bulan), dan performa per toko.
  * Return { cur, prev, months:[{ month, amount, inPeriod }], stores:[{ id, code, name, status, submitted, paidOut, paidOutAmount, rank }] }.
@@ -258,7 +287,7 @@ export async function partnerProfile(session, { retry = false } = {}) {
   };
 }
 
-// ------------------------------------------------------------------ PDB-09 Dokumen (PRD v3 F6)
+// ------------------------------------------------------------------ PDB-09 Dokumen (PRD Scope 1 FR-PD-007)
 /**
  * PKS bertanda tangan (bila diunggah Admin) + Dokumen Partner versi terbaru berstatus Valid; Foto Toko tidak ditampilkan.
  * Return { pks: { label, file } | null, documents:[{ key, label, file }] }.
@@ -271,4 +300,17 @@ export async function partnerDocuments(session, { retry = false } = {}) {
   const documents = p.documents.filter((d) => d.level === 'PARTNER' && d.file && d.verification === 'VALID')
     .map((d) => ({ key: d.key, label: d.label, file: clone(d.file) }));
   return { pks, documents };
+}
+
+/**
+ * Isi file dokumen untuk Unduh. Prototipe membuat file placeholder di browser (src/lib/download.js).
+ * Skenario DevToolbar download = fail → DOWNLOAD_FAILED. Dokumen harus milik partner sesi (selain itu NOT_FOUND).
+ */
+export async function partnerDocumentFile(session, key) {
+  await wait(300);
+  const p = own(session);
+  if (getScenario().download === 'fail') throw new ApiError('DOWNLOAD_FAILED');
+  const doc = key === 'PKS' ? p.pks.file && { name: p.pks.file.name } : p.documents.find((d) => d.key === key && d.level === 'PARTNER' && d.file && d.verification === 'VALID')?.file;
+  if (!doc) throw new ApiError('NOT_FOUND');
+  return placeholderFile(doc.name);
 }

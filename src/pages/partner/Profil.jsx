@@ -10,6 +10,7 @@ import {
   BANKS, CHANNEL, CHANNEL_OFFLINE, ENTITY, PIC_STATUS, PRODUCT_SOLD, PRODUCT_TYPE, SCALE, STORE_LOCATION, STORE_STATUS, STORE_TYPE, areaName,
 } from '../../lib/constants.js';
 import { formatDate, formatPhone } from '../../lib/format.js';
+import { errorView } from './common.jsx';
 
 const STORE_BADGE = { ACTIVE: 'completed', PENDING: 'pending', INACTIVE: 'disabled' };
 
@@ -22,14 +23,14 @@ export function Profil(props) {
 function ProfilView({ user, onLogout, path }) {
   const [p, setP] = useState(null);
   const [view, setView] = useState('loading');
-  const load = (retry) => { setView('loading'); partnerProfile(user, { retry }).then((r) => { setP(r); setView('data'); }, () => setView('error')); };
+  const load = (retry) => { setView('loading'); partnerProfile(user, { retry }).then((r) => { setP(r); setView('data'); }, (e) => setView(errorView(e))); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load(false); }, []);
 
   return (
     <PartnerShell active={path} icon="Building2Line" title="Profil" description="Data partner, PIC, rekening, dan toko Anda." user={user} onLogout={onLogout}>
       <Alert status="information" size="sm" title="Untuk perubahan data, hubungi Amar Bank." />
-      {view === 'error' ? <ListCard view="error" onRetry={() => load(true)} /> : view === 'loading' ? (
+      {view === 'error' || view === 'notfound' ? <ListCard view={view} onRetry={() => load(true)} /> : view === 'loading' ? (
         [0, 1, 2].map((i) => <SectionCard key={i}>{bar('100%', 96, 'var(--rounded-12)')}</SectionCard>)
       ) : (
         <>
@@ -38,7 +39,7 @@ function ProfilView({ user, onLogout, path }) {
               { label: 'Nama Partner', value: p.partnerName },
               { label: 'No. Registrasi', value: p.registrationNumber },
               { label: 'Kode Merchant', value: p.merchantCode },
-              { label: 'Kode Referral', value: p.referralCode },
+              { label: 'Kode Referral', value: p.referralCode || 'Tidak diisi' },
               { label: 'Jenis Badan Usaha', value: ENTITY[p.entity] },
               { label: 'Area', value: areaName(p.areaId) },
               { label: 'Alamat Partner (sesuai legalitas)', value: p.address, full: true },
