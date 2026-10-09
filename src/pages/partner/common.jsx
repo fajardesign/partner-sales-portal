@@ -59,3 +59,7 @@ export function PeriodFilter({ path, query, period, children }) {
 /** Query periode untuk tautan antar halaman (Beranda → Transaksi). */
 // eslint-disable-next-line react/only-export-components
 export const periodQuery = (query) => Object.fromEntries([...query.entries()].filter(([k]) => ['mode', 'm', 'from', 'to'].includes(k)));
+
+/** State halaman dari error API: NOT_FOUND (data bukan milik sesi / tidak ada, API 404) → "notfound"; selain itu "error". */
+// eslint-disable-next-line react/only-export-components
+export const errorView = (e) => (e?.code === 'NOT_FOUND' ? 'notfound' : 'error');

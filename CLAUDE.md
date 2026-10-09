@@ -1,8 +1,10 @@
 # Partner Sales Portal (Partner Dashboard)
 
-Partner Dashboard web untuk **Partner (PIC)** Amar Bank — realm role `PARTNER`, platform `partner-web-access`,
-feature PARTNER_SALES_DASHBOARD, PARTNER_COMMISSION, PARTNER_PROFILE (lihat saja), TRANSACTION_INQUIRY, DOCUMENT_REPOSITORY.
-Cakupan data: partner & toko milik sesi saja. Sumber: PRD v3 §F + revisi stakeholder di knowledge bundle.
+Partner Dashboard web untuk **Partner (PIC)** Amar Bank — realm role `PARTNER`, platform `partner-web-access`.
+**Scope 1 = Beranda Partner, Profil, Dokumen** (feature PARTNER_PROFILE lihat saja, DOCUMENT_REPOSITORY). Transaksi, Komisi, dan
+Penjualan (PARTNER_SALES_DASHBOARD, TRANSACTION_INQUIRY, PARTNER_COMMISSION) disembunyikan sampai Scope 3 lewat flag
+`SCOPE3_MENUS` di `src/lib/nav.js`; halamannya tetap disimpan. Cakupan data: partner & toko milik sesi saja (di luar itu 404).
+Responsif sampai lebar ponsel. Sumber: PRD Scope 1 §1.6 https://amarbank.atlassian.net/wiki/x/BwBbAAE + knowledge bundle.
 
 ## Design system (wajib)
 Semua UI di repo ini **harus** memakai Amar Bank Internal Web DS di `design-system/`

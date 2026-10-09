@@ -10,7 +10,7 @@ import { useScenario } from '../../dev/scenario.js';
 import { nowrap } from '../../lib/cells.jsx';
 import { formatDateWIB, formatRp } from '../../lib/format.js';
 import { navigate, withQuery } from '../../lib/router.js';
-import { PeriodFilter, usePeriod } from './common.jsx';
+import { PeriodFilter, errorView, usePeriod } from './common.jsx';
 
 const BADGE = { SUBMITTED: 'information', IN_PROCESS: 'pending', APPROVED: 'information', REJECTED: 'failed', PAID_OUT: 'completed' };
 const dateCell = (d) => { const f = formatDateWIB(d); return { priority: 'regular', title: nowrap(f.date), description: f.time }; };
@@ -32,7 +32,7 @@ function TransaksiView({ user, onLogout, query, path }) {
   const key = JSON.stringify([period.from, period.to, f, page]);
   const load = (retry) => {
     setView('loading');
-    partnerTransactions(user, period, f, page, { retry }).then((r) => { setData(r); setView(r.total ? 'data' : 'empty'); }, () => setView('error'));
+    partnerTransactions(user, period, f, page, { retry }).then((r) => { setData(r); setView(r.total ? 'data' : 'empty'); }, (e) => setView(errorView(e)));
   };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load(false); }, [key]);
@@ -74,10 +74,10 @@ function TransaksiView({ user, onLogout, query, path }) {
         <span style={{ font: 'var(--paragraph-sm)', color: 'var(--text-sub-600)' }}>{period.label}</span>
       </div>
       <TbdCallout>Format penyamaran ID aplikasi dan nama nasabah perlu dikonfirmasi.</TbdCallout>
-      <ListCard view={view === 'empty' || view === 'error' ? view : null} onRetry={() => load(true)}
+      <ListCard view={['empty', 'error', 'notfound'].includes(view) ? view : null} onRetry={() => load(true)}
         emptyMessage={filtered ? 'Tidak ada transaksi yang sesuai dengan pencarian atau filter.' : 'Belum ada transaksi pada periode ini.'}
         footer={view === 'data' && <ListPager page={data.page} total={data.total} noun="transaksi" onChange={(p) => set({ page: String(p) })} />}>
-        {view !== 'error' && view !== 'empty' && (
+        {(view === 'loading' || view === 'data') && (
           <DataTable loading={view === 'loading'} rows={data?.rows ?? []} columns={columns} sort={f.sort} onSort={onSort} minWidth={1040} />
         )}
       </ListCard>

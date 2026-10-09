@@ -17,8 +17,11 @@ const LOGIN_ERRORS = {
 /** Akun internal contoh yang ditolak di Partner Dashboard. */
 const DEMO_DENIED = [['rina.saraswati@amarbank.co.id', 'Admin → Akses ditolak'], ['andi.pratama@amarbank.co.id', 'TL → Akses ditolak']];
 
-/** PDB-01 · Login Partner Dashboard. onLoggedIn(session); onDenied({ loginId, role }) untuk akun bukan Partner. */
-export function Login({ onLoggedIn, onDenied }) {
+/**
+ * PDB-01 · Login Partner Dashboard. onLoggedIn(session); onDenied({ loginId, role }) untuk akun bukan Partner.
+ * notice = { status, title } setelah sesi diakhiri sistem (idle/maks. 12 jam, atau partner Inactive).
+ */
+export function Login({ onLoggedIn, onDenied, notice }) {
   const init = preset?.login ?? {};
   const [loginId, setLoginId] = useState(init.loginId ?? '');
   const [password, setPassword] = useState(init.password ?? '');
@@ -67,6 +70,7 @@ export function Login({ onLoggedIn, onDenied }) {
           <AuthHero icon="User6Line" title="Masuk ke Partner Dashboard" description="Masukkan email atau nomor telepon dan password Anda." />
           <ContentDivider />
           {error && <Alert status="error" size="sm" title={error} />}
+          {!error && (notice ?? init.notice) && <Alert status={(notice ?? init.notice).status} size="sm" title={(notice ?? init.notice).title} />}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-12)' }}>
             <TextInput label="Email atau Nomor Telepon" required leftIcon="User6Line" placeholder="nama@email.com atau 08123456789"
               value={loginId} onChange={(e) => setLoginId(e.target.value)} autoComplete="username" />

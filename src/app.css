@@ -1,2 +1,34 @@
 html, body { margin: 0; }
 @keyframes sk-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+
+/* Shell Partner Dashboard (src/components/PartnerShell.jsx). Desktop: Sidebar 272px + PageHeader + konten pad 24/32. */
+.ps-shell { display: flex; height: 100vh; background: var(--bg-white-0); }
+.ps-sidebar { display: flex; height: 100%; }
+.ps-main { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
+.ps-topbar { display: none; }
+.ps-header-actions { display: flex; align-items: center; gap: var(--space-12); }
+.ps-content { flex: 1; overflow: auto; padding: var(--space-24) var(--space-32) var(--space-32); display: flex; flex-direction: column; gap: var(--space-16); }
+.ps-drawer-nav { height: 100%; display: flex; }
+
+/*
+ * Lebar ponsel (PRD Scope 1 §14 / AS-PD-01). Batas 767px ditulis literal karena custom property tidak bisa dipakai di
+ * kondisi @media. Sidebar → bar atas + Drawer menu; target sentuh ≥ 44px (40 + 4); tanpa scroll horizontal halaman.
+ * !important dipakai hanya untuk menimpa style inline komponen DS/halaman (DS tidak diubah).
+ */
+@media (max-width: 767px) {
+  html, body { overflow-x: hidden; }
+  .ps-sidebar { display: none; }
+  .ps-topbar {
+    display: flex; align-items: center; justify-content: space-between; gap: var(--space-12);
+    padding: var(--space-8) var(--space-16); box-shadow: inset 0 -1px 0 var(--stroke-soft-200); background: var(--bg-white-0);
+  }
+  .ps-page-header header { padding: var(--space-16) !important; }
+  .ps-page-header header > span[aria-hidden] { left: var(--space-16) !important; right: var(--space-16) !important; }
+  .ps-header-actions, .ps-header-media { display: none !important; }
+  .ps-content { padding: var(--space-16); }
+  .ps-content section { padding: var(--space-16) !important; }
+  .ps-content dl { grid-template-columns: minmax(0, 1fr) !important; }
+  .ps-toast { top: var(--space-16) !important; left: var(--space-16); right: var(--space-16) !important; }
+  .ps-toast > * { width: auto !important; max-width: 100%; }
+  .ps-content button, .ps-topbar button, .ps-drawer-nav button { min-height: calc(var(--space-40) + var(--space-4)); }
+}

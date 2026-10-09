@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, render, renderHook, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import App from '../App.jsx';
 import { DEFAULT_SCENARIO, setScenario } from '../dev/scenario.js';
@@ -7,6 +7,8 @@ import { demoSession } from '../dev/session.js';
 import { DEMO_PASSWORD } from '../api/db.js';
 import { supabaseLogin } from '../api/auth.js';
 import { ROLES } from '../lib/constants.js';
+import { SCOPE3_MENUS } from '../lib/nav.js';
+import { IDLE_MS, MAX_SESSION_MS, useSessionTimeout } from '../lib/useSessionTimeout.js';
 
 const T = { timeout: 4000 };
 const go = (path) => { window.location.hash = path; };
@@ -37,11 +39,12 @@ describe('PDB-01 Login', () => {
     expect(screen.getByRole('button', { name: 'Masuk' }).disabled).toBe(true);
   });
 
-  it('PIC Active masuk ke Beranda dengan menu sesuai feature', async () => {
+  it('PIC Active masuk ke Beranda Partner; menu Scope 1 saja (Transaksi/Komisi disembunyikan sampai Scope 3)', async () => {
     await start(PIC);
     expect(await screen.findByText('Partner (PIC) · Jaya Abadi Cellular', {}, T)).toBeTruthy();
     expect(window.location.hash).toBe('#/beranda');
-    ['Beranda', 'Transaksi', 'Komisi', 'Profil', 'Dokumen'].forEach((m) => expect(screen.getAllByText(m).length).toBeGreaterThan(0));
+    ['Beranda Partner', 'Profil', 'Dokumen'].forEach((m) => expect(screen.getAllByText(m).length).toBeGreaterThan(0));
+    ['Transaksi', 'Komisi', 'Penjualan'].forEach((m) => expect(screen.queryByText(m)).toBeNull());
   });
 
   it('login dengan nomor telepon (awalan 0) diterima', async () => {
@@ -102,10 +105,35 @@ describe('PDB-02 Akses ditolak & PDB-03 gangguan', () => {
 
 describe('PDB-04 Shell & penjagaan rute', () => {
   it('rute terproteksi tanpa sesi → login, lalu kembali ke rute tersebut', async () => {
-    go('/komisi');
+    go('/dokumen');
     await start(PIC);
     expect(await screen.findByText('Partner (PIC) · Jaya Abadi Cellular', {}, T)).toBeTruthy();
-    expect(window.location.hash).toBe('#/komisi');
+    expect(window.location.hash).toBe('#/dokumen');
+  });
+
+  it('rute Scope 3 (Penjualan, Transaksi, Komisi) dianggap tidak dikenal → Beranda Partner', async () => {
+    expect(SCOPE3_MENUS).toBe(false);
+    for (const r of ['/penjualan', '/transaksi', '/komisi']) {
+      sessionStorage.setItem('partner-dashboard-session', JSON.stringify(demoSession('rudi.jaya')));
+      go(r);
+      render(<App />);
+      expect(await screen.findByText('Ringkasan partner Anda.', {}, T)).toBeTruthy();
+      expect(window.location.hash).toBe('#/beranda');
+      cleanup();
+    }
+  });
+
+  it('tombol Menu (lebar ponsel) membuka navigasi di Drawer', async () => {
+    sessionStorage.setItem('partner-dashboard-session', JSON.stringify(demoSession('rudi.jaya')));
+    go('/beranda');
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(screen.getByRole('button', { name: 'Buka menu' }));
+    const nav = screen.getByRole('navigation', { name: 'Menu' });
+    expect(within(nav).getByRole('button', { name: 'Keluar' })).toBeTruthy();
+    await user.click(within(nav).getByText('Dokumen'));
+    expect(window.location.hash).toBe('#/dokumen');
+    expect(screen.queryByRole('navigation', { name: 'Menu' })).toBeNull();
   });
 
   it('rute tanpa feature → Akses ditolak di dalam shell, menu disembunyikan', async () => {
@@ -126,6 +154,55 @@ describe('PDB-04 Shell & penjagaan rute', () => {
     await user.click(within(document.querySelector('main')).getByRole('button', { name: 'Keluar' }));
     expect(await screen.findByRole('button', { name: 'Masuk' }, T)).toBeTruthy();
     expect(sessionStorage.getItem('partner-dashboard-session')).toBeNull();
+  });
+});
+
+describe('Sesi berakhir (PRD Scope 1 FR-PD-008)', () => {
+  it('partner Inactive / akun PIC Disabled → sesi dihapus, kembali ke login dengan pesan', async () => {
+    sessionStorage.setItem('partner-dashboard-session', JSON.stringify(demoSession('yusuf.global')));
+    go('/profil');
+    render(<App />);
+    expect(await screen.findByText('Akun Anda tidak aktif. Hubungi Admin.', {}, T)).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Masuk' })).toBeTruthy();
+    expect(window.location.hash).toBe('#/login');
+    expect(sessionStorage.getItem('partner-dashboard-session')).toBeNull();
+  });
+
+  it('useSessionTimeout: idle 30 menit atau 12 jam sejak login memanggil onExpire', () => {
+    vi.useFakeTimers();
+    try {
+      let n = 0;
+      const { unmount } = renderHook(() => useSessionTimeout(true, Date.now(), () => { n += 1; }));
+      vi.advanceTimersByTime(IDLE_MS - 60000);
+      expect(n).toBe(0);
+      window.dispatchEvent(new Event('keydown'));
+      vi.advanceTimersByTime(IDLE_MS - 60000);
+      expect(n).toBe(0);
+      vi.advanceTimersByTime(90000);
+      expect(n).toBeGreaterThan(0);
+      unmount();
+      n = 0;
+      renderHook(() => useSessionTimeout(true, Date.now() - MAX_SESSION_MS, () => { n += 1; }));
+      vi.advanceTimersByTime(30000);
+      expect(n).toBeGreaterThan(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('sesi idle diakhiri → login menampilkan pesan sesi berakhir', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      sessionStorage.setItem('partner-dashboard-session', JSON.stringify(demoSession('rudi.jaya')));
+      go('/profil');
+      render(<App />);
+      await screen.findByText('Kode Referral', {}, T);
+      vi.advanceTimersByTime(IDLE_MS + 30000);
+      expect(await screen.findByText('Sesi Anda berakhir karena tidak ada aktivitas. Silakan masuk lagi.', {}, T)).toBeTruthy();
+      expect(sessionStorage.getItem('partner-dashboard-session')).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
