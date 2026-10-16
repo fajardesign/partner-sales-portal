@@ -72,7 +72,7 @@ describe('PDB-05 Beranda Partner (FR-PD-005)', () => {
     expect(await screen.findByText('Halo, Rudi', {}, T)).toBeTruthy();
     expect(screen.getAllByText('Jaya Abadi Cellular').length).toBeGreaterThan(0);
     expect(screen.getByText('Active')).toBeTruthy();
-    expect(screen.getByText('3 toko')).toBeTruthy();
+    expect(screen.getByText('4 toko')).toBeTruthy(); // termasuk toko baru yang menunggu kode referral
     expect(screen.queryByText('Pinjaman diajukan')).toBeNull();
     await user.click(screen.getByText('Lihat data partner, PIC, rekening, dan toko.').closest('button'));
     expect(window.location.hash).toBe('#/profil');
@@ -182,23 +182,16 @@ describe('PDB-08 Profil', () => {
   it('lihat saja: catatan hubungi Amar Bank, Kode Referral, rekening tersamar, toko', async () => {
     open('/profil');
     expect(screen.getByText('Untuk perubahan data, hubungi Amar Bank.')).toBeTruthy();
-    expect(await screen.findByText('Kode Referral', {}, T)).toBeTruthy();
+    expect((await screen.findAllByText('Kode Referral', {}, T)).length).toBe(4); // per toko (PRD Scope 1 v2)
     expect(screen.getByText(/^•+\d{4}$/)).toBeTruthy();
     expect(screen.getByText('Toko Utama')).toBeTruthy();
     expect(screen.queryByRole('button', { name: /Ubah/ })).toBeNull();
   });
 
-  it('Kode Referral kosong → "Tidak diisi"', async () => {
-    const p = partners.find((x) => x.id === 'REG2026-0139');
-    const prev = p.referralCode;
-    p.referralCode = null;
-    try {
-      open('/profil');
-      await screen.findByText('Kode Referral', {}, T);
-      expect(screen.getByText('Tidak diisi')).toBeTruthy();
-    } finally {
-      p.referralCode = prev;
-    }
+  it('AC-PD-005: Kode Referral per toko; toko tanpa kode → "Tidak diisi"', async () => {
+    open('/profil');
+    expect(await screen.findByText('OFMKS1391', {}, T)).toBeTruthy();
+    expect(screen.getByText('Tidak diisi')).toBeTruthy(); // toko baru menunggu kode referral
   });
 });
 
