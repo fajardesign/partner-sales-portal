@@ -1,7 +1,8 @@
 import { AmarBankLogo, Icon } from '@ds/index.js';
+import { VersionTag } from './VersionTag.jsx';
 
 /** Layout halaman Keycloak-themed (W1 Login, Akses ditolak, KC1 Aktivasi): header logo, kartu tengah, footer. */
-export function AuthLayout({ label, footer = <span>© 2026 Amar Bank</span>, children }) {
+export function AuthLayout({ label, footer = <><span>© 2026 Amar Bank</span><VersionTag /></>, children }) {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg-weak-50)' }}>
       <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--space-24) 44px' }}>
