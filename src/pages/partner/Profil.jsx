@@ -12,7 +12,7 @@ import {
 import { formatDate, formatPhone } from '../../lib/format.js';
 import { errorView } from './common.jsx';
 
-const STORE_BADGE = { ACTIVE: 'completed', PENDING: 'pending', INACTIVE: 'disabled' };
+const STORE_BADGE = { ACTIVE: 'completed', PENDING: 'pending', WAITING_REFERRAL: 'pending', INACTIVE: 'disabled' };
 
 /** PDB-08 · Profil (PRD v3 F5, PARTNER_PROFILE lihat saja): data partner, PIC, rekening tersamar, toko. Tanpa tombol ubah. */
 export function Profil(props) {
@@ -39,7 +39,6 @@ function ProfilView({ user, onLogout, path }) {
               { label: 'Nama Partner', value: p.partnerName },
               { label: 'No. Registrasi', value: p.registrationNumber },
               { label: 'Kode Merchant', value: p.merchantCode },
-              { label: 'Kode Referral', value: p.referralCode || 'Tidak diisi' },
               { label: 'Jenis Badan Usaha', value: ENTITY[p.entity] },
               { label: 'Area', value: areaName(p.areaId) },
               { label: 'Alamat Partner (sesuai legalitas)', value: p.address, full: true },
@@ -85,6 +84,8 @@ function ProfilView({ user, onLogout, path }) {
                 </div>
                 <KeyValueGrid columns={3} items={[
                   { label: 'Kode Toko', value: s.code },
+                  // PRD Scope 1 v2 FR-PD-006: Kode Referral per toko (diisi Admin dari AppsFlyer)
+                  { label: 'Kode Referral', value: s.referralCode || 'Tidak diisi' },
                   { label: 'Tipe Toko', value: STORE_TYPE[s.storeType] },
                   ...(s.storeType === 'OFFLINE' ? [{ label: 'Channel Offline', value: CHANNEL_OFFLINE[s.channelOffline] }] : []),
                   { label: 'Alamat Toko', value: s.address, full: true },

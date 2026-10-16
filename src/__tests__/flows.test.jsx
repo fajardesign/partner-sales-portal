@@ -196,7 +196,7 @@ describe('Sesi berakhir (PRD Scope 1 FR-PD-008)', () => {
       sessionStorage.setItem('partner-dashboard-session', JSON.stringify(demoSession('rudi.jaya')));
       go('/profil');
       render(<App />);
-      await screen.findByText('Kode Referral', {}, T);
+      await screen.findAllByText('Kode Referral', {}, T);
       vi.advanceTimersByTime(IDLE_MS + 30000);
       expect(await screen.findByText('Sesi Anda berakhir karena tidak ada aktivitas. Silakan masuk lagi.', {}, T)).toBeTruthy();
       expect(sessionStorage.getItem('partner-dashboard-session')).toBeNull();

@@ -276,12 +276,12 @@ export async function partnerProfile(session, { retry = false } = {}) {
   const p = own(session);
   return {
     id: p.id, registrationNumber: p.registrationNumber, partnerName: p.partnerName, entity: p.businessEntityType, merchantCode: p.merchantCode,
-    referralCode: p.referralCode, address: p.address, province: p.province, city: p.city, district: p.district, village: p.village, rt: p.rt, rw: p.rw,
+    address: p.address, province: p.province, city: p.city, district: p.district, village: p.village, rt: p.rt, rw: p.rw,
     areaId: p.areaId, status: p.status, activatedAt: p.activatedAt, businessEmail: p.businessEmail, channel: p.channel, businessLocationCount: p.businessLocationCount,
     pic: clone(p.pic),
     bank: { code: p.bank.code, branch: p.bank.branch, accountNumber: maskAccount(p.bank.accountNumber), accountName: p.bank.accountName },
     stores: p.stores.map((s) => ({
-      id: s.id, code: s.code, name: s.name, primary: s.primary, address: s.address, status: s.status, storeType: s.storeType,
+      id: s.id, code: s.code, referralCode: s.referralCode, name: s.name, primary: s.primary, address: s.address, status: s.status, storeType: s.storeType,
       channelOffline: s.channelOffline, scale: s.scale, productSold: s.productSold, location: s.location, productType: s.productType, lat: s.lat, lng: s.lng,
     })),
   };
