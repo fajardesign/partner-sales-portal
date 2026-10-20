@@ -98,6 +98,8 @@ function own(session) {
   }
   return p;
 }
+/** Toko yang tampil di Partner Dashboard: tanpa toko Dibatalkan (PRD 1.1 AC-040 / AC-PD-005, keputusan 2026-10-20). */
+const visibleStores = (p) => p.stores.filter((s) => s.status !== 'CANCELLED');
 const storeName = (p, storeId) => p.stores.find((s) => s.id === storeId)?.name ?? '-';
 
 /** Ringkasan partner untuk shell (nama partner di chip pengguna). */
@@ -163,7 +165,7 @@ const partnerLoans = (p) => loans.filter((l) => l.partnerId === p.id);
 export async function partnerHome(session, { retry = false } = {}) {
   await listGate(retry);
   const p = own(session);
-  return { picName: p.pic.name, partnerName: p.partnerName, status: p.status, storeCount: p.stores.length };
+  return { picName: p.pic.name, partnerName: p.partnerName, status: p.status, storeCount: visibleStores(p).length };
 }
 
 // ------------------------------------------------------------------ Penjualan (PRD v3 F2, disembunyikan sampai Scope 3)
@@ -181,7 +183,7 @@ export async function partnerDashboard(session, period, { retry = false } = {}) 
     const r = monthRange(m);
     return { month: m, amount: salesStats(within(r)).paidOutAmount, inPeriod: r.from <= period.to && r.to >= period.from };
   });
-  const stores = p.stores.map((s) => ({ id: s.id, code: s.code, name: s.name, status: s.status, primary: s.primary, ...salesStats(cur.filter((l) => l.storeId === s.id)) }))
+  const stores = visibleStores(p).map((s) => ({ id: s.id, code: s.code, name: s.name, status: s.status, primary: s.primary, ...salesStats(cur.filter((l) => l.storeId === s.id)) }))
     .sort((a, b) => b.paidOutAmount - a.paidOutAmount || b.submitted - a.submitted)
     .map((s, i) => ({ ...s, rank: i + 1 }));
   return { cur: salesStats(cur), prev: salesStats(within(previousPeriod(period))), months, stores };
@@ -189,7 +191,7 @@ export async function partnerDashboard(session, period, { retry = false } = {}) 
 
 // ------------------------------------------------------------------ PDB-06 Transaksi (PRD v3 F3)
 /** Pilihan toko untuk filter (semua toko partner). */
-export const storeOptions = (session) => (findP(session?.partnerId)?.stores ?? []).map((s) => ({ value: s.id, label: s.code ? `${s.name} (${s.code})` : s.name }));
+export const storeOptions = (session) => (findP(session?.partnerId) ? visibleStores(findP(session.partnerId)) : []).map((s) => ({ value: s.id, label: s.code ? `${s.name} (${s.code})` : s.name }));
 
 const TX_SORT = { submitted: (l) => l.submittedAt.getTime(), amount: (l) => l.amount, updated: (l) => l.updatedAt.getTime() };
 /**
@@ -280,7 +282,7 @@ export async function partnerProfile(session, { retry = false } = {}) {
     areaId: p.areaId, status: p.status, activatedAt: p.activatedAt, businessEmail: p.businessEmail, channel: p.channel, businessLocationCount: p.businessLocationCount,
     pic: clone(p.pic),
     bank: { code: p.bank.code, branch: p.bank.branch, accountNumber: maskAccount(p.bank.accountNumber), accountName: p.bank.accountName },
-    stores: p.stores.map((s) => ({
+    stores: visibleStores(p).map((s) => ({
       id: s.id, code: s.code, referralCode: s.referralCode, name: s.name, primary: s.primary, address: s.address, status: s.status, storeType: s.storeType,
       channelOffline: s.channelOffline, scale: s.scale, productSold: s.productSold, location: s.location, productType: s.productType, lat: s.lat, lng: s.lng,
     })),
