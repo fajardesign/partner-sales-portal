@@ -2,12 +2,15 @@
 // Data di src/api/db.js (salinan seed admin-sales-portal, memori). Fungsi async dengan jeda kecil agar state loading terlihat.
 import { getScenario } from '../dev/scenario.js';
 import { normalizePhone } from '../lib/format.js';
-import { ACTIVATION_TTL_MS, PAGE_SIZE } from '../lib/constants.js';
+import { ACTIVATION_TTL_MS, ROLES } from '../lib/constants.js';
 import { placeholderFile } from '../lib/download.js';
-import { CURRENT_MONTH, loans, mfp, MONTHS, now, partners, schemes, superAdmins, targets, users, wibDate } from './db.js';
+import { CURRENT_MONTH, MONTHS, now, partners, superAdmins, users, wibDate } from './db.js';
 
 const TEST = import.meta.env.MODE === 'test';
-const wait = (ms) => new Promise((r) => setTimeout(r, TEST ? 0 : ms));
+export const wait = (ms) => new Promise((r) => setTimeout(r, TEST ? 0 : ms));
+/** Dipakai bersama src/api/scope3.js (salinan identik dari admin-sales-portal). */
+export const userById = (id) => users.find((u) => u.id === id) ?? superAdmins.find((u) => u.id === id);
+export const actorOf = (session) => `${session.name} (${ROLES[session.role]?.short ?? session.role})`;
 
 export class ApiError extends Error {
   constructor(code, field) { super(code); this.code = code; this.field = field; }
@@ -100,7 +103,6 @@ function own(session) {
 }
 /** Toko yang tampil di Partner Dashboard: tanpa toko Dibatalkan (PRD 1.1 AC-040 / AC-PD-005, keputusan 2026-10-20). */
 const visibleStores = (p) => p.stores.filter((s) => s.status !== 'CANCELLED');
-const storeName = (p, storeId) => p.stores.find((s) => s.id === storeId)?.name ?? '-';
 
 /** Ringkasan partner untuk shell (nama partner di chip pengguna). */
 export function partnerSummary(partnerId) {
@@ -134,28 +136,14 @@ export function previousPeriod(period) {
   }
   return { from: addDays(period.from, -len), to: addDays(period.from, -1) };
 }
-const inP = (ymd, p) => ymd >= p.from && ymd <= p.to;
-const pct = (a, b) => (b ? (a / b) * 100 : 0);
-const nextMonth = (ym) => { const [y, m] = ym.split('-').map(Number); const d = new Date(Date.UTC(y, m, 1)); return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`; };
 
 /** Samaran (sama dengan APL, PRD v3 §B2): ID "APP-••••1234", nama "Bu•• Sa•••••". */
 export const maskId = (id) => `APP-••••${id.slice(-4)}`;
 export const maskName = (n) => n.split(' ').map((w) => w.slice(0, 2) + '•'.repeat(Math.max(1, w.length - 2))).join(' ');
 /** Nomor rekening tersamar: 4 digit terakhir. */
 export const maskAccount = (n) => `${'•'.repeat(Math.max(0, n.length - 4))}${n.slice(-4)}`;
-export const CRM_STATUS = { SUBMITTED: 'Pengajuan', IN_PROCESS: 'Diproses', APPROVED: 'Disetujui', REJECTED: 'Ditolak', PAID_OUT: 'Dicairkan' };
 
 /** Agregat penjualan (berdasarkan tanggal pengajuan, sama dengan Kinerja Penjualan APL). */
-function salesStats(rows) {
-  const paid = rows.filter((l) => l.status === 'PAID_OUT');
-  return {
-    submitted: rows.length,
-    accepted: rows.filter((l) => l.status === 'APPROVED' || l.status === 'PAID_OUT').length,
-    paidOut: paid.length,
-    paidOutAmount: paid.reduce((a, l) => a + l.amount, 0),
-  };
-}
-const partnerLoans = (p) => loans.filter((l) => l.partnerId === p.id);
 
 // ------------------------------------------------------------------ PDB-05 Beranda Partner (PRD Scope 1 FR-PD-005)
 /**
@@ -168,108 +156,11 @@ export async function partnerHome(session, { retry = false } = {}) {
   return { picName: p.pic.name, partnerName: p.partnerName, status: p.status, storeCount: visibleStores(p).length };
 }
 
-// ------------------------------------------------------------------ Penjualan (PRD v3 F2, disembunyikan sampai Scope 3)
-/**
- * Ringkasan penjualan partner pada periode + periode sebelumnya, tren nominal cair per bulan (6 bulan), dan performa per toko.
- * Return { cur, prev, months:[{ month, amount, inPeriod }], stores:[{ id, code, name, status, submitted, paidOut, paidOutAmount, rank }] }.
- */
-export async function partnerDashboard(session, period, { retry = false } = {}) {
-  const empty = await listGate(retry);
-  const p = own(session);
-  const all = empty ? [] : partnerLoans(p);
-  const within = (per) => all.filter((l) => inP(wibDate(l.submittedAt), per));
-  const cur = within(period);
-  const months = MONTHS.map((m) => {
-    const r = monthRange(m);
-    return { month: m, amount: salesStats(within(r)).paidOutAmount, inPeriod: r.from <= period.to && r.to >= period.from };
-  });
-  const stores = visibleStores(p).map((s) => ({ id: s.id, code: s.code, name: s.name, status: s.status, primary: s.primary, ...salesStats(cur.filter((l) => l.storeId === s.id)) }))
-    .sort((a, b) => b.paidOutAmount - a.paidOutAmount || b.submitted - a.submitted)
-    .map((s, i) => ({ ...s, rank: i + 1 }));
-  return { cur: salesStats(cur), prev: salesStats(within(previousPeriod(period))), months, stores };
-}
-
-// ------------------------------------------------------------------ PDB-06 Transaksi (PRD v3 F3)
+// ------------------------------------------------------------------ Pilihan toko (Pinjaman, PRD Scope 3 FR-PI-007)
 /** Pilihan toko untuk filter (semua toko partner). */
 export const storeOptions = (session) => (findP(session?.partnerId) ? visibleStores(findP(session.partnerId)) : []).map((s) => ({ value: s.id, label: s.code ? `${s.name} (${s.code})` : s.name }));
 
-const TX_SORT = { submitted: (l) => l.submittedAt.getTime(), amount: (l) => l.amount, updated: (l) => l.updatedAt.getTime() };
-/**
- * Pengajuan pinjaman dari toko partner (read-only, data CRM). f: { q (4 digit terakhir ID), store, status, sort "key:dir" }, page.
- * Return { total, page, rows:[{ id, maskedId, customer, store, amount, status, submittedAt, updatedAt }] }.
- */
-export async function partnerTransactions(session, period, f = {}, page = 1, { retry = false } = {}) {
-  const empty = await listGate(retry);
-  const p = own(session);
-  const q = (f.q ?? '').replace(/\D/g, '');
-  const [sk, sd] = (f.sort || 'submitted:desc').split(':');
-  const key = TX_SORT[sk] ?? TX_SORT.submitted;
-  const rows = (empty ? [] : partnerLoans(p))
-    .filter((l) => inP(wibDate(l.submittedAt), period) && (!f.store || l.storeId === f.store) && (!f.status || l.status === f.status) && (!q || l.id.slice(-4).includes(q)))
-    .sort((a, b) => (sd === 'asc' ? key(a) - key(b) : key(b) - key(a)));
-  const pages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
-  const pg = Math.min(Math.max(1, page), pages);
-  return {
-    total: rows.length, page: pg,
-    rows: rows.slice((pg - 1) * PAGE_SIZE, pg * PAGE_SIZE).map((l) => ({
-      id: l.id, maskedId: maskId(l.id), customer: maskName(l.customer), store: storeName(p, l.storeId),
-      amount: l.amount, status: l.status, submittedAt: l.submittedAt, updatedAt: l.updatedAt,
-    })),
-  };
-}
-
-// ------------------------------------------------------------------ PDB-07 Komisi (PRD v3 F4, skema Super Admin INC)
-export function versionFor(recipient, ym) {
-  const s = schemes.find((x) => x.recipient === recipient);
-  return [...s.versions].sort((a, b) => (a.effectiveFrom < b.effectiveFrom ? 1 : -1)).find((v) => v.effectiveFrom <= ym) ?? s.versions[0];
-}
-/** Tier yang cocok: nilai > from (tier pertama ≥ 0) dan ≤ to (to null = tak terbatas). */
-export function tierFor(component, value) {
-  const tiers = [...component.tiers].sort((a, b) => a.from - b.from);
-  return tiers.find((t, i) => (i === 0 ? value >= t.from : value > t.from) && (t.to == null || value <= t.to)) ?? tiers[tiers.length - 1];
-}
-export const tierLabel = (t) => (t.to == null ? `> ${t.from}%` : t.from === 0 ? `0% s/d ${t.to}%` : `> ${t.from}% s/d ${t.to}%`);
-const rate = (r) => `${String(r).replace('.', ',')}%`;
-
-/**
- * Komisi partner bulan ym — rumus sama dengan computeIncentives admin-sales-portal (baris partner):
- * Store = Offline Retailer (Volume Incentive dari pencapaian target paid out + Collection Incentive dari rasio MFP);
- * Non-Store = Affiliate (Commission 5% dari disbursement). Dasar: pinjaman dicairkan pada bulan ym (tanggal cair).
- */
-function commissionFor(p, ym) {
-  const range = monthRange(ym);
-  const paidIn = partnerLoans(p).filter((l) => l.status === 'PAID_OUT' && inP(wibDate(l.paidOutAt), range));
-  const paid = paidIn.reduce((a, l) => a + l.amount, 0);
-  const storeIds = [...new Set(paidIn.map((l) => l.storeId))];
-  const target = storeIds.reduce((a, id) => a + (targets[`${id}:${ym}`] ?? 0), 0);
-  const achievement = pct(paid, target);
-  const status = ym === CURRENT_MONTH ? 'ESTIMATE' : 'PAID';
-  const base = { month: ym, paidOutAmount: paid, target, achievement, status };
-  if (p.channel === 'NON_STORE') {
-    const v = versionFor('PARTNER_AFFILIATE', ym); const c = v.components[0];
-    const components = [{ label: c.label, amount: (paid * c.rate) / 100, detail: `${rate(c.rate)} dari disbursement` }];
-    return { ...base, scheme: 'Affiliate / Sales Agency', tier: '-', components, total: components[0].amount, version: v.version, payDate: `${nextMonth(ym)}-${String(v.payday).padStart(2, '0')}` };
-  }
-  const v = versionFor('PARTNER_RETAIL', ym);
-  const vol = v.components.find((c) => c.key === 'volume'); const col = v.components.find((c) => c.key === 'collection');
-  const m = storeIds.length ? storeIds.reduce((a, sid) => a + (mfp[`${sid}:${ym}`] ?? 0), 0) / storeIds.length : 0;
-  const tv = tierFor(vol, achievement); const tc = tierFor(col, m);
-  const components = [
-    { label: 'Volume Incentive', amount: (paid * tv.rate) / 100, detail: `Pencapaian ${achievement.toFixed(0)}% · tier ${tierLabel(tv)} · tarif ${rate(tv.rate)}` },
-    { label: 'Collection Incentive (MFP)', amount: (paid * tc.rate) / 100, detail: `MFP ${m.toFixed(1).replace('.', ',')}% · tier ${tierLabel(tc)} · tarif ${rate(tc.rate)}` },
-  ];
-  return { ...base, scheme: 'Offline Retailer', tier: tierLabel(tv), mfp: paidIn.length ? m : null, components, total: components.reduce((a, c) => a + c.amount, 0), version: v.version, payDate: `${nextMonth(ym)}-${String(v.payday).padStart(2, '0')}` };
-}
-
-/** Estimasi bulan berjalan + riwayat per bulan sejak partner aktif (terbaru di atas). Return { current, history }. */
-export async function partnerCommission(session, { retry = false } = {}) {
-  const empty = await listGate(retry);
-  const p = own(session);
-  const start = p.activatedAt ? wibDate(p.activatedAt).slice(0, 7) : CURRENT_MONTH;
-  const months = empty ? [] : MONTHS.filter((m) => m >= start).reverse();
-  const history = months.map((m) => commissionFor(p, m));
-  return { current: history.find((h) => h.month === CURRENT_MONTH) ?? null, history };
-}
+// Insentif, Pinjaman, Rekening (PRD Scope 3): src/api/partnerScope3.js + src/api/scope3.js.
 
 // ------------------------------------------------------------------ PDB-08 Profil (PRD v3 F5, lihat saja)
 /** Data partner, PIC, rekening (tersamar), dan toko. Tanpa status verifikasi rekening (revisi stakeholder 2026-10-08). */

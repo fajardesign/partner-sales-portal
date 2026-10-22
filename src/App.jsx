@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { navigate, useHashRoute } from './lib/router.js';
+import { navigate, useHashRoute, withQuery } from './lib/router.js';
 import { DEMO } from './lib/env.js';
-import { featureForPath, homeFor } from './lib/nav.js';
+import { ALIASES, featureForPath, homeFor } from './lib/nav.js';
 import { useSessionTimeout } from './lib/useSessionTimeout.js';
 import { onAccountDisabled } from './api/mockApi.js';
 import { ToasterProvider } from './components/Toaster.jsx';
@@ -9,9 +9,9 @@ import { ForbiddenPage } from './components/ForbiddenPage.jsx';
 import { Login } from './pages/Login.jsx';
 import { AccessDenied } from './pages/AccessDenied.jsx';
 import { Beranda } from './pages/partner/Beranda.jsx';
-import { Penjualan } from './pages/partner/Penjualan.jsx';
-import { Transaksi } from './pages/partner/Transaksi.jsx';
-import { Komisi } from './pages/partner/Komisi.jsx';
+import { Pinjaman } from './pages/partner/Pinjaman.jsx';
+import { Rekening } from './pages/partner/Rekening.jsx';
+import { Insentif } from './pages/partner/Insentif.jsx';
 import { Profil } from './pages/partner/Profil.jsx';
 import { Dokumen } from './pages/partner/Dokumen.jsx';
 import { DevToolbar } from './dev/DevToolbar.jsx';
@@ -25,7 +25,7 @@ import { preset } from './dev/presets.js';
  *  /penjualan, /transaksi, /komisi — disembunyikan sampai Scope 3 (SCOPE3_MENUS); selama itu dianggap rute tidak dikenal.
  * Aktivasi & reset password akun PIC tetap di admin-sales-portal (#/activate).
  */
-const PAGES = { '/beranda': Beranda, '/penjualan': Penjualan, '/transaksi': Transaksi, '/komisi': Komisi, '/profil': Profil, '/dokumen': Dokumen };
+const PAGES = { '/beranda': Beranda, '/insentif': Insentif, '/pinjaman': Pinjaman, '/rekening': Rekening, '/profil': Profil, '/dokumen': Dokumen };
 
 const SESSION_KEY = 'partner-dashboard-session';
 const RETURN_KEY = 'partner-dashboard-return';
@@ -80,7 +80,8 @@ export default function App() {
 
   const redirect = path === '/denied' ? (denied ? null : '/login')
     : !session ? (path !== '/login' ? '/login' : null)
-      : path === '/login' || !feature ? homeFor(session) : null;
+      : ALIASES[path] ? withQuery(ALIASES[path], Object.fromEntries(query.entries()))
+        : path === '/login' || !feature ? homeFor(session) : null;
   useEffect(() => {
     if (!redirect) return;
     if (!session && feature) store.set(RETURN_KEY, `${path}${query.toString() ? `?${query}` : ''}`);

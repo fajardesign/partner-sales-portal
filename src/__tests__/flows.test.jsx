@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, renderHook, screen, within } from '@testing-library/react';
+import { cleanup, render, renderHook, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import App from '../App.jsx';
 import { DEFAULT_SCENARIO, setScenario } from '../dev/scenario.js';
@@ -39,11 +39,11 @@ describe('PDB-01 Login', () => {
     expect(screen.getByRole('button', { name: 'Masuk' }).disabled).toBe(true);
   });
 
-  it('PIC Active masuk ke Beranda Partner; menu Scope 1 saja (Transaksi/Komisi disembunyikan sampai Scope 3)', async () => {
+  it('PIC Active masuk ke Beranda Partner; menu Insentif, Pinjaman, Rekening (PRD 3.0); Transaksi/Komisi/Penjualan tidak ada lagi', async () => {
     await start(PIC);
     expect(await screen.findByText('Partner (PIC) · Jaya Abadi Cellular', {}, T)).toBeTruthy();
     expect(window.location.hash).toBe('#/beranda');
-    ['Beranda Partner', 'Profil', 'Dokumen'].forEach((m) => expect(screen.getAllByText(m).length).toBeGreaterThan(0));
+    ['Beranda Partner', 'Insentif', 'Pinjaman', 'Rekening', 'Profil', 'Dokumen'].forEach((m) => expect(screen.getAllByText(m).length).toBeGreaterThan(0));
     ['Transaksi', 'Komisi', 'Penjualan'].forEach((m) => expect(screen.queryByText(m)).toBeNull());
   });
 
@@ -70,11 +70,12 @@ describe('PDB-01 Login', () => {
     expect(await screen.findByText('Akun Anda tidak aktif. Hubungi Admin.', {}, T)).toBeTruthy();
   });
 
-  it('Lupa password? menampilkan petunjuk Hubungi Admin', async () => {
+  it('Portal Mitra Amar Bank: "Lupa password? Hubungi Amar Bank" menampilkan kontak', async () => {
     const user = userEvent.setup();
     render(<App />);
-    await user.click(screen.getByText('Lupa password?'));
-    expect(screen.getByText('Hubungi Admin untuk mengatur ulang password Anda.')).toBeTruthy();
+    expect(screen.getAllByText('Portal Mitra Amar Bank').length).toBeGreaterThan(0);
+    await user.click(screen.getByText('Lupa password? Hubungi Amar Bank'));
+    expect(screen.getByText(/Hubungi Amar Bank melalui WhatsApp/)).toBeTruthy();
   });
 });
 
@@ -111,14 +112,13 @@ describe('PDB-04 Shell & penjagaan rute', () => {
     expect(window.location.hash).toBe('#/dokumen');
   });
 
-  it('rute Scope 3 (Penjualan, Transaksi, Komisi) dianggap tidak dikenal → Beranda Partner', async () => {
-    expect(SCOPE3_MENUS).toBe(false);
-    for (const r of ['/penjualan', '/transaksi', '/komisi']) {
+  it('rute lama (Komisi, Transaksi, Penjualan) dialihkan ke Insentif, Pinjaman, Beranda (PRD 3.0)', async () => {
+    expect(SCOPE3_MENUS).toBe(true);
+    for (const [r, to] of [['/komisi', '#/insentif'], ['/transaksi', '#/pinjaman'], ['/penjualan', '#/beranda']]) {
       sessionStorage.setItem('partner-dashboard-session', JSON.stringify(demoSession('rudi.jaya')));
       go(r);
       render(<App />);
-      expect(await screen.findByText('Ringkasan partner Anda.', {}, T)).toBeTruthy();
-      expect(window.location.hash).toBe('#/beranda');
+      await waitFor(() => expect(window.location.hash).toBe(to));
       cleanup();
     }
   });

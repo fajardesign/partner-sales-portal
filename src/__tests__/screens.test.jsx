@@ -1,15 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import App from '../App.jsx';
 import { DEFAULT_SCENARIO, setScenario } from '../dev/scenario.js';
 import { demoSession } from '../dev/session.js';
 import { loans, partners } from '../api/db.js';
-import { partnerCommission, partnerDocuments, partnerHome, partnerProfile, partnerTransactions, monthRange } from '../api/mockApi.js';
-import { ToasterProvider } from '../components/Toaster.jsx';
-import { Penjualan } from '../pages/partner/Penjualan.jsx';
-import { Transaksi } from '../pages/partner/Transaksi.jsx';
-import { Komisi } from '../pages/partner/Komisi.jsx';
+import { partnerDocuments, partnerHome, partnerProfile } from '../api/mockApi.js';
+import { partnerBank, partnerIncentive, partnerLoan, partnerLoans } from '../api/partnerScope3.js';
 
 const T = { timeout: 4000 };
 const go = (path) => { window.location.hash = path; };
@@ -21,13 +18,6 @@ function open(path, handle = 'rudi.jaya') {
   render(<App />);
   return user;
 }
-/** Render langsung halaman Scope 3 (rutenya disembunyikan selama SCOPE3_MENUS = false). */
-function page(Page, path, qs = '', handle = 'rudi.jaya') {
-  const user = userEvent.setup();
-  render(<ToasterProvider><Page user={demoSession(handle)} onLogout={() => {}} path={path} query={new URLSearchParams(qs)} /></ToasterProvider>);
-  return user;
-}
-
 beforeEach(() => { setScenario(DEFAULT_SCENARIO); sessionStorage.clear(); });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
@@ -36,9 +26,11 @@ describe('Isolasi data partner', () => {
     const s = demoSession('rudi.jaya');
     const own = partners.find((p) => p.id === s.partnerId);
     const names = own.stores.map((x) => x.name);
-    const tx = await partnerTransactions(s, monthRange('2026-09'), {}, 1);
+    const tx = await partnerLoans(s, '2026-09', {}, 1);
     expect(tx.total).toBe(loans.filter((l) => l.partnerId === own.id && l.submittedAt.toISOString() >= '2026-08-31T17:00' && l.submittedAt.toISOString() < '2026-09-30T17:00').length);
     tx.rows.forEach((r) => expect(names).toContain(r.store));
+    tx.rows.forEach((r) => expect(r).not.toHaveProperty('sales'));
+    await expect(partnerLoan(s, loans.find((l) => l.partnerId !== own.id).id)).rejects.toMatchObject({ code: 'NOT_FOUND' });
     expect((await partnerProfile(s)).id).toBe(own.id);
     await expect(partnerProfile({ ...s, partnerId: 'REG2026-9999' })).rejects.toMatchObject({ code: 'NOT_FOUND' });
     // partnerId milik partner lain (bukan milik akun sesi) → 404, bukan data partner lain.
@@ -58,11 +50,15 @@ describe('Isolasi data partner', () => {
     expect(docs.documents.some((d) => d.key.startsWith('FOTO'))).toBe(false);
   });
 
-  it('Komisi: bulan berjalan Estimasi, bulan lalu Dibayar tgl 15 bulan berikutnya', async () => {
-    const { current, history } = await partnerCommission(demoSession('rudi.jaya'));
-    expect(current).toMatchObject({ month: '2026-10', status: 'ESTIMATE', payDate: '2026-11-15', scheme: 'Offline Retailer' });
-    expect(history.find((h) => h.month === '2026-09')).toMatchObject({ status: 'PAID', payDate: '2026-10-15' });
-    expect(current.components.map((c) => c.label)).toEqual(['Volume Incentive', 'Collection Incentive (MFP)']);
+  it('Insentif partner (PRD Scope 3): volume saja; September Final menunggu pembayaran tgl 15; rekening disamarkan', async () => {
+    const s = demoSession('rudi.jaya');
+    const cur = await partnerIncentive(s, '2026-10');
+    expect(cur.row).toMatchObject({ ym: '2026-10', monthStatus: 'BERJALAN', payment: null });
+    expect(cur.row.incentive).toBe(Math.floor((cur.row.actual * cur.row.coefficient) / 100));
+    const sep = await partnerIncentive(s, '2026-09');
+    expect(sep.row).toMatchObject({ monthStatus: 'FINAL', payment: { status: expect.stringMatching(/MENUNGGU|TIDAK_ADA/), scheduledAt: '2026-10-15' } });
+    expect(sep.stores.reduce((a, x) => a + x.amount, 0)).toBe(sep.row.actual);
+    expect((await partnerBank(s)).bank.accountNumber).toMatch(/\d{4}$/);
   });
 });
 
@@ -113,68 +109,37 @@ describe('PDB-05 Beranda Partner (FR-PD-005)', () => {
   });
 });
 
-describe('Penjualan (disembunyikan sampai Scope 3)', () => {
-  it('kartu penjualan, tren, dan peringkat toko (partner > 1 toko)', async () => {
-    page(Penjualan, '/penjualan');
-    expect(await screen.findByText('Penjualan · Oktober 2026', {}, T)).toBeTruthy();
-    expect(screen.getByText('Pinjaman diajukan')).toBeTruthy();
-    expect(screen.getByText('Nominal cair')).toBeTruthy();
-    expect(await screen.findByText('Peringkat', {}, T)).toBeTruthy();
-    expect(screen.getByText('#1')).toBeTruthy();
-    expect(screen.getByRole('img', { name: 'Nominal cair per bulan' })).toBeTruthy();
+describe('PRD Scope 3 · Partner Dashboard', () => {
+  it('menu Insentif, Pinjaman, Rekening; Beranda menampilkan kartu insentif bulan ini dan bulan final terakhir', async () => {
+    open('/beranda');
+    expect(await screen.findByText('Insentif bulan ini', {}, T)).toBeTruthy();
+    expect(screen.getByText('Insentif September 2026')).toBeTruthy();
+    ['Insentif', 'Pinjaman', 'Rekening'].forEach((m) => expect(screen.getAllByText(m).length).toBeGreaterThan(0));
   });
-
-  it('partner satu toko tanpa kolom Peringkat; kartu membuka Transaksi terfilter', async () => {
-    const user = page(Penjualan, '/penjualan', 'm=2026-09', 'hendra.medan');
-    expect(await screen.findByText('Performa toko · September 2026', {}, T)).toBeTruthy();
-    await screen.findByText('Medan Selular', {}, T);
-    expect(screen.queryByText('Peringkat')).toBeNull();
-    await user.click(screen.getByText('Pinjaman cair').closest('button'));
-    expect(window.location.hash).toBe('#/transaksi?m=2026-09&status=PAID_OUT');
+  it('Insentif: status bulan, rincian per toko, riwayat, kontak', async () => {
+    open('/insentif?m=2026-09');
+    expect(await screen.findByText('Cair dihitung per toko', {}, T)).toBeTruthy();
+    expect(screen.getByText('Riwayat insentif')).toBeTruthy();
+    expect(screen.getByText('Insentif dihitung dari pinjaman yang diajukan dan cair di bulan yang sama.')).toBeTruthy();
+    expect(screen.getByText(/Ada pertanyaan\? Hubungi Amar Bank/)).toBeTruthy();
   });
-
-  it('error memuat → Coba lagi', async () => {
-    setScenario({ tableState: 'error' });
-    const user = page(Penjualan, '/penjualan');
-    await user.click(await screen.findByRole('button', { name: 'Coba lagi' }, T));
-    expect(await screen.findByText('Penjualan · Oktober 2026', {}, T)).toBeTruthy();
-  });
-});
-
-describe('PDB-06 Transaksi (disembunyikan sampai Scope 3)', () => {
-  it('daftar tersamar dengan pager 20 baris', async () => {
-    page(Transaksi, '/transaksi', 'm=2026-09');
-    expect((await screen.findAllByText(/^APP-••••\d{4}$/, {}, T)).length).toBe(20);
-    expect(screen.getByText(/^1–20 dari \d+ transaksi$/)).toBeTruthy();
-    expect(screen.getByText('[TBD: Format penyamaran ID aplikasi dan nama nasabah perlu dikonfirmasi.]')).toBeTruthy();
-  });
-
-  it('filter status dari URL hanya menampilkan status tsb', async () => {
-    page(Transaksi, '/transaksi', 'm=2026-09&status=REJECTED');
-    await screen.findAllByText(/^APP-••••/, {}, T);
-    const table = screen.getByRole('table');
-    expect(within(table).getAllByText('Ditolak').length).toBeGreaterThan(0);
-    expect(within(table).queryByText('Dicairkan')).toBeNull();
-  });
-
-  it('pencarian tanpa hasil → pesan filter; data kosong → pesan periode', async () => {
-    page(Transaksi, '/transaksi', 'q=00000');
-    expect(await screen.findByText('Tidak ada transaksi yang sesuai dengan pencarian atau filter.', {}, T)).toBeTruthy();
+  it('Pinjaman: funnel 4 status, cari nomor referensi, detail; pinjaman partner lain tidak ditemukan', async () => {
+    const own = partners.find((p) => p.id === demoSession('rudi.jaya').partnerId);
+    const l = loans.filter((x) => x.partnerId === own.id && x.submittedAt.toISOString() >= '2026-08-31T17:00' && x.submittedAt.toISOString() < '2026-09-30T17:00')[0];
+    const user = open('/pinjaman?m=2026-09');
+    expect(await screen.findByText('Dihitung untuk insentif', {}, T)).toBeTruthy();
+    await user.type(screen.getByPlaceholderText('Cari nomor referensi'), l.id);
+    await user.click(await screen.findByText(l.id, {}, T));
+    expect(await screen.findByText('Terakhir diperbarui', {}, T)).toBeTruthy();
     cleanup();
-    setScenario({ tableState: 'empty' });
-    page(Transaksi, '/transaksi');
-    expect(await screen.findByText('Belum ada transaksi pada periode ini.', {}, T)).toBeTruthy();
+    const other = loans.find((x) => x.partnerId !== own.id);
+    open(`/pinjaman?m=2026-09&id=${other.id}`);
+    expect(await screen.findByText('Halaman tidak ditemukan', {}, T)).toBeTruthy();
   });
-});
-
-describe('PDB-07 Komisi (disembunyikan sampai Scope 3)', () => {
-  it('estimasi bulan ini + riwayat Estimasi/Dibayar', async () => {
-    page(Komisi, '/komisi');
-    expect(await screen.findByText('Estimasi komisi', {}, T)).toBeTruthy();
-    expect(screen.getAllByText('15 Nov 2026').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Dibayar').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Estimasi').length).toBeGreaterThan(0);
-    expect(screen.getByText(/^\[TBD: Sumber target paid out/)).toBeTruthy();
+  it('Rekening: nomor rekening disamarkan dan banner tujuan pembayaran', async () => {
+    open('/rekening');
+    expect(await screen.findByText(/Insentif dibayarkan ke rekening ini/, {}, T)).toBeTruthy();
+    expect(screen.getByText(/^•+\d{4}$/)).toBeTruthy();
   });
 });
 
