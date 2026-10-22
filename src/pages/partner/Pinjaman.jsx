@@ -108,7 +108,6 @@ function LoanDrawer({ id, user, onClose }) {
               { label: 'Diajukan', value: formatDateTime(l.submittedAt) },
               { label: 'Cair', value: formatDateTime(l.paidOutAt) },
               { label: 'Terakhir diperbarui', value: formatDateTime(l.updatedAt) },
-              l.rejectionReason && { label: 'Alasan ditolak', value: l.rejectionReason, full: true },
             ]} />
           </>
         )}

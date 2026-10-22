@@ -75,7 +75,6 @@ export async function partnerLoan(session, id) {
   return {
     id: l.id, customer: maskName(l.customer), store: storeNameOf(p, l.storeId), amount: l.amount, portalStatus: portalStatus(l),
     submittedAt: l.submittedAt, updatedAt: l.updatedAt, paidOutAt: l.paidOutAt, counted: countsFor(l, ym), paidLater: portalStatus(l) === 'CAIR' && !countsFor(l, ym), ym,
-    rejectionReason: l.rejectionReason ?? null,
   };
 }
 /** Rekening partner (FR-PI-008), hanya baca; nomor rekening disamarkan 4 digit terakhir. null bila belum ada. */
