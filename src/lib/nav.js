@@ -1,24 +1,26 @@
 /**
- * Menu & rute Partner Dashboard per feature access role (PRD Scope 1 §1.6, platform partner-web-access).
+ * Menu & rute Partner Dashboard per feature access role (PRD Scope 1 §1.6, platform partner-web-access; PRD Scope 3 §3.4).
  * Menu tampil bila sesi memiliki feature-nya; rute yang dibuka langsung tanpa feature → "Akses ditolak" di dalam shell.
  *
- * Scope 1 = Beranda Partner, Profil, Dokumen. Item bertanda `scope3` (Penjualan, Transaksi, Komisi) disembunyikan sampai
- * Scope 3: selama SCOPE3_MENUS = false rutenya dianggap tidak dikenal (diarahkan ke Beranda Partner). Halamannya tetap disimpan.
+ * Scope 1 = Beranda Partner, Profil, Dokumen. Scope 3 (PRD 3.0) = Insentif (volume), Pinjaman, Rekening; Penjualan dilebur
+ * ke Beranda dan Pinjaman. Rute lama /komisi, /transaksi, /penjualan dialihkan (ALIASES).
  */
-export const SCOPE3_MENUS = false;
+export const SCOPE3_MENUS = true;
 
 const NAV = [
   { title: 'Utama', items: [
     { label: 'Beranda Partner', value: '/beranda', icon: 'Dashboard3Line', feature: 'PARTNER_PROFILE' },
-    { label: 'Penjualan', value: '/penjualan', icon: 'LineChartLine', feature: 'PARTNER_SALES_DASHBOARD', scope3: true },
-    { label: 'Transaksi', value: '/transaksi', icon: 'FileList2Line', feature: 'TRANSACTION_INQUIRY', scope3: true },
-    { label: 'Komisi', value: '/komisi', icon: 'HandCoinLine', feature: 'PARTNER_COMMISSION', scope3: true },
+    { label: 'Insentif', value: '/insentif', icon: 'HandCoinLine', feature: 'PARTNER_COMMISSION', scope3: true },
+    { label: 'Pinjaman', value: '/pinjaman', icon: 'FileList2Line', feature: 'TRANSACTION_INQUIRY', scope3: true },
   ] },
   { title: 'Partner', items: [
+    { label: 'Rekening', value: '/rekening', icon: 'BankLine', feature: 'PARTNER_PROFILE', scope3: true },
     { label: 'Profil', value: '/profil', icon: 'Building2Line', feature: 'PARTNER_PROFILE' },
     { label: 'Dokumen', value: '/dokumen', icon: 'FolderLine', feature: 'DOCUMENT_REPOSITORY' },
   ] },
 ];
+/** Rute lama Scope 3 sebelum PRD 3.0 → rute baru. */
+export const ALIASES = { '/komisi': '/insentif', '/transaksi': '/pinjaman', '/penjualan': '/beranda' };
 
 const enabled = (i) => SCOPE3_MENUS || !i.scope3;
 

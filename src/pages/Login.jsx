@@ -6,6 +6,7 @@ import { ApiError, demoPicAccounts } from '../api/mockApi.js';
 import { DEMO_PASSWORD } from '../api/db.js';
 import { DEMO, LOGIN_MODE } from '../lib/env.js';
 import { preset } from '../dev/presets.js';
+import { PARTNER_CONTACT } from '../lib/constants.js';
 
 /** Pesan error login (PRD v3 tabel cek; identitas = email atau nomor telepon, revisi stakeholder 2026-10-08). */
 const LOGIN_ERRORS = {
@@ -54,7 +55,7 @@ export function Login({ onLoggedIn, onDenied, notice }) {
   // PDB-03 · Halaman gangguan layanan (PRD v3: full-page error dengan "Coba lagi").
   if (outage) {
     return (
-      <AuthLayout label="Partner Dashboard">
+      <AuthLayout label="Portal Mitra Amar Bank">
         <AuthCard center gap="var(--space-16)">
           <StatusMessage status="error" icon="ErrorWarningFill" title="Layanan tidak tersedia">Gagal memuat data. Coba lagi.</StatusMessage>
           <Button fullWidth leftIcon={<Icon name="RefreshLine" />} onClick={() => setOutage(false)}>Coba lagi</Button>
@@ -64,10 +65,10 @@ export function Login({ onLoggedIn, onDenied, notice }) {
   }
 
   return (
-    <AuthLayout label="Partner Dashboard">
+    <AuthLayout label="Portal Mitra Amar Bank">
       <form onSubmit={submit} style={{ display: 'contents' }}>
         <AuthCard>
-          <AuthHero icon="User6Line" title="Masuk ke Partner Dashboard" description="Masukkan email atau nomor telepon dan password Anda." />
+          <AuthHero icon="User6Line" title="Portal Mitra Amar Bank" description="Pantau pinjaman toko Anda dan insentif bulanan dari Amar Bank." />
           <ContentDivider />
           {error && <Alert status="error" size="sm" title={error} />}
           {!error && (notice ?? init.notice) && <Alert status={(notice ?? init.notice).status} size="sm" title={(notice ?? init.notice).title} />}
@@ -79,8 +80,8 @@ export function Login({ onLoggedIn, onDenied, notice }) {
           </div>
           <Button type="submit" fullWidth disabled={!valid || busy}>{busy ? 'Memproses...' : 'Masuk'}</Button>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-8)' }}>
-            <LinkButton onClick={() => setForgot((f) => !f)}>Lupa password?</LinkButton>
-            {forgot && <Alert status="information" size="sm" title="Hubungi Admin untuk mengatur ulang password Anda." />}
+            <LinkButton onClick={() => setForgot((f) => !f)}>Lupa password? Hubungi Amar Bank</LinkButton>
+            {forgot && <Alert status="information" size="sm" title={`Hubungi Amar Bank melalui ${PARTNER_CONTACT.channel} ${PARTNER_CONTACT.number} untuk mengatur ulang password.`} />}
           </div>
           {DEMO && !preset && <DemoPanel onPick={fill} />}
         </AuthCard>

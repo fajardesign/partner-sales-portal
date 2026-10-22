@@ -8,9 +8,11 @@ export const SCENARIO_OPTIONS = {
   tableState: ['data', 'loading', 'empty', 'error'],
   service: ['ok', 'outage'],
   download: ['ok', 'fail'],
+  // PRD Scope 3: tanggal hari ini untuk status bulan. 2026-10-03 = sebelum lock 5 Okt, September masih "Menunggu rekonsiliasi".
+  s3Today: ['2026-10-07', '2026-10-03'],
 };
-export const SCENARIO_LABELS = { tableState: 'Tabel', service: 'Layanan login', download: 'Unduh dokumen' };
-export const DEFAULT_SCENARIO = { tableState: 'data', service: 'ok', download: 'ok' };
+export const SCENARIO_LABELS = { tableState: 'Tabel', service: 'Layanan login', download: 'Unduh dokumen', s3Today: 'Tanggal Scope 3' };
+export const DEFAULT_SCENARIO = { tableState: 'data', service: 'ok', download: 'ok', s3Today: '2026-10-07' };
 
 let state = { ...DEFAULT_SCENARIO };
 const subs = new Set();
