@@ -63,13 +63,13 @@ function PinjamanView({ user, onLogout, path, query }) {
   return (
     <PartnerShell active={path} icon="FileList2Line" title="Pinjaman" description="Pinjaman yang diajukan melalui toko Anda." user={user} onLogout={onLogout}>
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 'var(--space-12)', flexWrap: 'wrap' }}>
-        <MonthSelect value={ym} onChange={(v) => set({ m: v })} />
+        <MonthSelect value={ym} onChange={(v) => set({ m: v })} kind="PARTNER" />
         <div style={{ width: 240 }}><Select size="sm" value={q.toko ?? ''} placeholder="Semua toko" onChange={(v) => set({ toko: v })} options={[{ value: '', label: 'Semua toko' }, ...storeOptions(user)]} /></div>
         <div style={{ width: 180 }}><Select size="sm" value={q.status ?? ''} placeholder="Semua status" onChange={(v) => set({ status: v })} options={STATUS_OPTS} /></div>
+        <SearchField placeholder="Cari nomor referensi" value={q.q ?? ''} onChange={(v) => set({ q: v })} />
       </div>
-      <SearchField placeholder="Cari nomor referensi" value={q.q ?? ''} onChange={(v) => set({ q: v })} />
       <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-12)', flexWrap: 'wrap', font: 'var(--paragraph-sm)', color: 'var(--text-sub-600)' }}>
-        Pengajuan dibuat di {monthLabel(ym, true)}{d && <AsOf asOf={d.asOf} ym={ym} onRefresh={() => load(true)} />}
+        Pengajuan dibuat di {monthLabel(ym, true)}{d && <AsOf asOf={d.asOf} ym={ym} kind="PARTNER" onRefresh={() => load(true)} />}
       </span>
       {d && view === 'data' && (
         <StatGrid min={170}>
