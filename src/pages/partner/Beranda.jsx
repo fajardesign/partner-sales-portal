@@ -106,10 +106,10 @@ function LinkCard({ path, icon, title, description }) {
   );
 }
 
-/** Kartu insentif bulan berjalan dan bulan Final terakhir (FR-PI-006). */
+/** Kartu insentif bulan berjalan dan bulan tutup terakhir: menunggu rekonsiliasi (final tanggal 10) atau Final (FR-PI-006). */
 function IncentiveCards({ inc, onRefresh }) {
   const c = inc.current;
-  const f = inc.lastFinal;
+  const f = inc.lastClosed;
   const muted = { font: 'var(--paragraph-sm)', color: 'var(--text-sub-600)' };
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, calc(var(--space-48) * 7)), 1fr))', gap: 'var(--space-12)' }}>
@@ -125,10 +125,10 @@ function IncentiveCards({ inc, onRefresh }) {
             {c.next && <span style={muted}>Butuh {formatRp(c.next.needed)} lagi untuk tier {rateLabel(c.next.tier.rate)}</span>}
           </div>
         )}
-        <AsOf asOf={inc.asOf} ym={c?.ym} onRefresh={onRefresh} />
+        <AsOf asOf={inc.asOf} ym={c?.ym} kind="PARTNER" onRefresh={onRefresh} />
       </SectionCard>
-      <SectionCard title={f ? `Insentif ${monthLabel(f.ym, true)}` : 'Bulan final terakhir'} badge={f && <PaymentBadge payment={f.payment} />}>
-        {!f ? <span style={muted}>Belum ada bulan yang final.</span> : (
+      <SectionCard title={f ? `Insentif ${monthLabel(f.ym, true)}` : 'Bulan lalu'} badge={f && <PaymentBadge payment={f.payment} />}>
+        {!f ? <span style={muted}>Belum ada bulan yang ditutup.</span> : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-8)' }}>
             <span style={{ font: 'var(--title-h5)', color: 'var(--text-strong-950)' }}>{formatRp(f.incentive)}</span>
             <PaymentLine payment={f.payment} />

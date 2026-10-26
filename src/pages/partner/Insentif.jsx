@@ -44,14 +44,14 @@ function InsentifView({ user, onLogout, path, query }) {
 
   return (
     <PartnerShell active={path} icon="HandCoinLine" title="Insentif" description="Insentif bulanan partner dari pinjaman toko Anda." user={user} onLogout={onLogout}>
-      <MonthSelect value={ym} onChange={(v) => navigate(withQuery('/insentif', { m: v }))} />
+      <MonthSelect value={ym} onChange={(v) => navigate(withQuery('/insentif', { m: v }))} kind="PARTNER" />
       <span style={muted}>Insentif dihitung dari pinjaman yang diajukan dan cair di bulan yang sama.</span>
       {view !== 'data' ? (
         <ListCard view={view} onRetry={() => load(true)} emptyMessage={`Belum ada data insentif untuk ${monthLabel(ym, true)}.`} />
       ) : (
         <>
           <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-8)', flexWrap: 'wrap' }}>
-            <MonthStatusBadge status={r.monthStatus} /><span style={muted}>{monthNote(ym)}</span><AsOf asOf={d.asOf} ym={ym} onRefresh={() => load(true)} />
+            <MonthStatusBadge status={r.monthStatus} /><span style={muted}>{monthNote(ym, 'PARTNER')}</span><AsOf asOf={d.asOf} ym={ym} kind="PARTNER" onRefresh={() => load(true)} />
           </span>
           <SectionCard title={`Insentif partner ${formatRp(r.incentive)}`} badge={<PaymentBadge payment={r.payment} />}>
             <IncentiveBlock r={r} tiers={d.tiers} />

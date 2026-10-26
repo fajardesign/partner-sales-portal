@@ -24,7 +24,7 @@ export async function partnerIncentive(session, ym, { retry = false } = {}) {
   const perStore = new Map();
   loans.filter((l) => l.partnerId === p.id && countsFor(l, ym)).forEach((l) => perStore.set(l.storeId, (perStore.get(l.storeId) ?? 0) + l.amount));
   const stores = p.stores.filter((s) => s.status !== 'CANCELLED').map((s) => ({ id: s.id, name: s.name, amount: perStore.get(s.id) ?? 0 }));
-  return { row: r, stores, tiers: configFor('partner', ym).tiers, monthStatus: monthStatus(ym), asOf };
+  return { row: r, stores, tiers: configFor('partner', ym).tiers, monthStatus: monthStatus(ym, 'PARTNER'), asOf };
 }
 /** Riwayat 12 bulan (terbaru dulu): status, target, Cair dihitung, capaian, koefisien, insentif, status pembayaran. */
 export async function partnerIncentiveHistory(session, { retry = false } = {}) {
@@ -39,13 +39,13 @@ export async function partnerIncentiveHistory(session, { retry = false } = {}) {
   }
   return out;
 }
-/** Beranda: insentif bulan berjalan + bulan Final terakhir. */
+/** Beranda: insentif bulan berjalan + bulan tutup terakhir (Menunggu rekonsiliasi atau Final menurut cut-off partner). */
 export async function partnerIncentiveHome(session, { retry = false } = {}) {
   await wait(200);
   const cur = await partnerIncentive(session, CURRENT_MONTH, { retry });
-  const lastFinal = partnerMonths().find((m) => monthStatus(m) === 'FINAL');
-  const fin = lastFinal ? (await partnerRows(lastFinal, { partnerId: session.partnerId }, { retry: true })).rows[0] ?? null : null;
-  return { current: cur.row, asOf: cur.asOf, lastFinal: fin };
+  const lastClosed = partnerMonths().find((m) => monthStatus(m, 'PARTNER') !== 'BERJALAN');
+  const fin = lastClosed ? (await partnerRows(lastClosed, { partnerId: session.partnerId }, { retry: true })).rows[0] ?? null : null;
+  return { current: cur.row, asOf: cur.asOf, lastClosed: fin };
 }
 
 /**

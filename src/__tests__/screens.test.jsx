@@ -50,13 +50,16 @@ describe('Isolasi data partner', () => {
     expect(docs.documents.some((d) => d.key.startsWith('FOTO'))).toBe(false);
   });
 
-  it('Insentif partner (PRD Scope 3): volume saja; September Final menunggu pembayaran tgl 15; rekening disamarkan', async () => {
+  it('Insentif partner (PRD Scope 3, round 10): volume saja; 7 Okt September menunggu rekonsiliasi (final 10), 12 Okt Final menunggu pembayaran tgl 15; rekening disamarkan', async () => {
     const s = demoSession('rudi.jaya');
     const cur = await partnerIncentive(s, '2026-10');
     expect(cur.row).toMatchObject({ ym: '2026-10', monthStatus: 'BERJALAN', payment: null });
     expect(cur.row.incentive).toBe(Math.floor((cur.row.actual * cur.row.coefficient) / 100));
     const sep = await partnerIncentive(s, '2026-09');
-    expect(sep.row).toMatchObject({ monthStatus: 'FINAL', payment: { status: expect.stringMatching(/MENUNGGU|TIDAK_ADA/), scheduledAt: '2026-10-15' } });
+    expect(sep.row).toMatchObject({ monthStatus: 'REKONSILIASI', payment: { status: 'REKONSILIASI', lockAt: '2026-10-10', scheduledAt: '2026-10-15' } });
+    setScenario({ s3Today: '2026-10-12' });
+    const fin = await partnerIncentive(s, '2026-09');
+    expect(fin.row).toMatchObject({ monthStatus: 'FINAL', payment: { status: expect.stringMatching(/MENUNGGU|TIDAK_ADA/), scheduledAt: '2026-10-15' } });
     expect(sep.stores.reduce((a, x) => a + x.amount, 0)).toBe(sep.row.actual);
     expect((await partnerBank(s)).bank.accountNumber).toMatch(/\d{4}$/);
   });
@@ -110,10 +113,11 @@ describe('PDB-05 Beranda Partner (FR-PD-005)', () => {
 });
 
 describe('PRD Scope 3 · Partner Dashboard', () => {
-  it('menu Insentif, Pinjaman, Rekening; Beranda menampilkan kartu insentif bulan ini dan bulan final terakhir', async () => {
+  it('menu Insentif, Pinjaman, Rekening; Beranda menampilkan kartu insentif bulan ini dan bulan lalu (rekonsiliasi sampai cut-off partner 10)', async () => {
     open('/beranda');
     expect(await screen.findByText('Insentif bulan ini', {}, T)).toBeTruthy();
     expect(screen.getByText('Insentif September 2026')).toBeTruthy();
+    expect(screen.getByText('Menunggu rekonsiliasi — final 10 Okt 2026')).toBeTruthy();
     ['Insentif', 'Pinjaman', 'Rekening'].forEach((m) => expect(screen.getAllByText(m).length).toBeGreaterThan(0));
   });
   it('Insentif: status bulan, rincian per toko, riwayat, kontak', async () => {
